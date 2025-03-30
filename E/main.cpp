@@ -48,14 +48,6 @@ int main() {
     }
   }
 
-  // its like we seek minimum of a function using CanPlace as a sign of derivative
-  // so the min cow distance function is sort of looks like a parabola??
-
-  // maybe its more like find a zero of a linear function but we can only take
-  // know the sign of a function value (the CanPlace function)
-
-  // brute force solution
-
   std::cout << answer << '\n';
   return 0;
 }

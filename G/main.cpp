@@ -1,89 +1,66 @@
 #include <algorithm>
-#include <cstddef>
-#include <functional>
 #include <iostream>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
+namespace {
+void RemoveFirstTwoChars(std::string& input_string, char char_to_remove) {
+  int removed = 0;
+  size_t current_index = 0;
+
+  while (current_index < input_string.size() && removed < 2) {
+    if (input_string[current_index] != char_to_remove) {
+      current_index++;
+      continue;
+    }
+
+    removed++;
+    input_string.erase(current_index, 1);
+  }
+}
+}  // namespace
 int main() {
   std::string input_string;
-  std::getline(std::cin, input_string);
+  std::cin >> input_string;
 
-  const int letters_in_alphabet = 26;
-
-  std::map<char, int> character_weights;
-  std::map<char, int> character_frequency;
-
-  for (auto char_in_string : input_string) {
-    character_frequency[char_in_string]++;
+  std::vector<std::pair<char, int>> weights;
+  for (int i = 0; i < 26; ++i) {
+    int weight = 0;
+    std::cin >> weight;
+    weights.emplace_back(static_cast<char>('a' + i), weight);
   }
 
-  for (size_t i = 0; i < letters_in_alphabet; i++) {
-    int input_weight = 0;
-    std::cin >> input_weight;
-
-    auto current_char = static_cast<unsigned char>('a' + i);
-
-    character_weights.emplace(current_char, input_weight);
+  std::map<char, int> char_frequency;
+  for (char c : input_string) {
+    char_frequency[c]++;
   }
 
-  std::vector<char> multi_occurrence_chars;
-  for (int i = 0; i < letters_in_alphabet; ++i) {
-    char current_char = static_cast<char>('a' + i);
-
-    if (character_frequency[current_char] >= 2) {
-      multi_occurrence_chars.push_back(current_char);
-    }
-  }
-
-  std::sort(
-      multi_occurrence_chars.begin(),
-      multi_occurrence_chars.end(),
-      [&character_weights](char var1, char var2) {
-        return character_weights[var1] > character_weights[var2];
+  std::stable_sort(
+      weights.begin(),
+      weights.end(),
+      [](const std::pair<char, int>& a, const std::pair<char, int>& b) {
+        return a.second > b.second;
       }
   );
 
-  size_t left = 0;
-  size_t right = input_string.length() - 1;
+  std::string start_of_the_result;
 
-  std::string output_string(input_string.length(), ' ');
+  for (auto& weight : weights) {
+    char current_char = weight.first;
+    if (char_frequency[current_char] >= 2) {
+      RemoveFirstTwoChars(input_string, current_char);
 
-  for (char chr : multi_occurrence_chars) {
-    if (character_frequency[chr] >= 2 && left <= right) {
-      output_string[left] = chr;
-      output_string[right] = chr;
-      character_frequency[chr] -= 2;
-      left++;
-      right--;
+      char_frequency[current_char] -= 2;
+      start_of_the_result += current_char;
     }
   }
 
-  std::vector<char> single_occurrence_chars;
-  for (char chr : input_string) {
-    if (character_frequency[chr] > 0) {
-      single_occurrence_chars.push_back(chr);
-      character_frequency[chr]--;
-    }
-  }
+  std::string end_of_the_result(start_of_the_result);
 
-  //   std::sort(
-  //       single_occurrence_chars.begin(),
-  //       single_occurrence_chars.end(),
-  //       [&character_weights](char var1, char var2) {
-  //         return character_weights[var1] < character_weights[var2];
-  //       }
-  //   );
+  std::reverse(end_of_the_result.begin(), end_of_the_result.end());
 
-  for (char chr : single_occurrence_chars) {
-    if (left > right) {
-      break;
-    }
-    output_string[left++] = chr;
-  }
-
-  std::cout << output_string << '\n';
-
+  std::cout << start_of_the_result + input_string + end_of_the_result << '\n';
   return 0;
 }
