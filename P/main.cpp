@@ -1,14 +1,8 @@
 #include <algorithm>
 #include <climits>
 #include <cstddef>
-#include <cstdint>
 #include <iostream>
-#include <map>
 #include <queue>
-#include <type_traits>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
 #include <vector>
 
 /*
@@ -39,77 +33,100 @@ we need to use primes algorithm to create a least sum subtree inside this full g
 нам выгодно использовать использовать такую структуру данных, чтобы быстро находить минимально
 возможное ребро внутри вершины, при этом нужно учесть что мы будем хранить все использованные ребра
 
+алгоритм Прима не сработал, потому что матрица не симметрична.
+
+будем делать бин поиск по ответу
+
+dfs оказался слишком медленным, попробую bfs
+
+- спросить почему uint16_t и uint32_t не поместились а обычные инты поместились
+
 */
 
-using CityIndex = size_t;
-using EdgeWeight = size_t;
+using CityIndex = uint;
+using EdgeWeight = int;
 
-using Edge = std::pair<EdgeWeight, CityIndex>;
+namespace {
+
+bool BfsAllVerticesWithEdgesLowerThan(
+    EdgeWeight upper_bound, const std::vector<std::vector<EdgeWeight>>& matrix, bool transpose
+) {
+  auto vertices_count = static_cast<CityIndex>(matrix.size());
+
+  std::vector<bool> visited(vertices_count, false);
+  std::queue<CityIndex> vertices_to_visit;
+  vertices_to_visit.push(0);
+  visited[0] = true;
+  size_t visited_count = 1;
+
+  while (!vertices_to_visit.empty()) {
+    CityIndex current_city = vertices_to_visit.front();
+    vertices_to_visit.pop();
+
+    for (CityIndex adj_city = 0; adj_city < vertices_count; adj_city++) {
+      if (visited[adj_city] || adj_city == current_city) {
+        continue;
+      }
+      EdgeWeight weight =
+          transpose ? matrix[current_city][adj_city] : matrix[adj_city][current_city];
+
+      if (weight > upper_bound) {
+        continue;
+      }
+
+      visited[adj_city] = true;
+      visited_count++;
+      vertices_to_visit.push(adj_city);
+      if (vertices_count == visited_count) {
+        return true;
+      }
+    }
+  }
+  return visited_count == vertices_count;
+}
+
+bool IsStronglyConnected(
+    EdgeWeight upper_bound, const std::vector<std::vector<EdgeWeight>>& matrix
+) {
+  return BfsAllVerticesWithEdgesLowerThan(upper_bound, matrix, false) &&
+         BfsAllVerticesWithEdgesLowerThan(upper_bound, matrix, true);
+}
+}  // namespace
 
 int main() {
-  size_t number_of_cities = 0;
+  CityIndex number_of_cities = 0;
   std::cin >> number_of_cities;
 
-  std::vector<std::vector<CityIndex>> initial_matrix(
-      number_of_cities, std::vector<CityIndex>(number_of_cities)
+  std::vector<std::vector<EdgeWeight>> matrix(
+      number_of_cities, std::vector<EdgeWeight>(number_of_cities)
   );
 
-  for (size_t i = 0; i < number_of_cities; i++) {
-    for (size_t j = 0; j < number_of_cities; j++) {
-      EdgeWeight current_city_weight = 0;
-
-      std::cin >> current_city_weight;
-
-      initial_matrix[i][j] = current_city_weight;
-    }
-  }
-
-  for (CityIndex i = 0; i < number_of_cities; ++i) {
-    for (CityIndex j = i + 1; j < number_of_cities; ++j) {
-      EdgeWeight sym_weight = std::min(initial_matrix[i][j], initial_matrix[j][i]);
-      initial_matrix[i][j] = sym_weight;
-      initial_matrix[j][i] = sym_weight;
-    }
-  }
-
-  // each city has n-1 edges in a full graph
-  std::vector<std::vector<Edge>> city_index_to_adj(
-      number_of_cities, std::vector<Edge>(number_of_cities - 1)
-  );
-
+  EdgeWeight max_weight = 0;
   for (CityIndex i = 0; i < number_of_cities; ++i) {
     for (CityIndex j = 0; j < number_of_cities; ++j) {
-      if (i != j && initial_matrix[i][j] != 0) {
-        city_index_to_adj[i].emplace_back(initial_matrix[i][j], j);
+      std::cin >> matrix[i][j];
+      if (i != j) {
+        max_weight = std::max(max_weight, matrix[i][j]);
       }
     }
   }
 
-  std::vector<bool> in_mst(number_of_cities, false);
-  std::priority_queue<Edge, std::vector<Edge>, std::greater<>> available_edges;
-  available_edges.emplace(0, 0);  // Start from city 0 with weight 0
-  size_t min_fuel_tank = 0;
-  size_t mst_size = 0;
+  EdgeWeight high = max_weight;
+  EdgeWeight low = 0;
 
-  while (!available_edges.empty() && mst_size < number_of_cities) {
-    auto [weight, u] = available_edges.top();
-    available_edges.pop();
-    if (in_mst[u]) {
-      continue;
-    }
+  EdgeWeight answer = 0;
 
-    in_mst[u] = true;
-    mst_size++;
-    min_fuel_tank = std::max(min_fuel_tank, weight);
-
-    for (const auto& [adj_weight, v] : city_index_to_adj[u]) {
-      if (!in_mst[v]) {
-        available_edges.emplace(adj_weight, v);
-      }
+  while (low <= high) {
+    EdgeWeight mid = (high + low) / 2;
+    if (IsStronglyConnected(mid, matrix)) {
+      answer = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
     }
   }
 
-  std::cout << min_fuel_tank << '\n';
+  std::cout << answer << '\n';
 
   return 0;
 }
