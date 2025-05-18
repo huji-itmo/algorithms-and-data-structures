@@ -9,6 +9,7 @@
 
 */
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -37,6 +38,7 @@ VertexType CharToVertexType(char chr) {
       return VertexType::Water;
     default:
       assert(false);
+      return VertexType::Uninitialized;
   }
 }
 
@@ -83,45 +85,49 @@ std::vector<MapPoint> GetAdjVertices(
 
   return res;
 }
-Distance Dijkstra(
-    const Coordinates& starting_pos,
+void Dijkstra(
+    const Coordinates& start_pos,
     const std::vector<std::vector<VertexType>>& map,
-    const Coordinates& destination
+    const Coordinates& destination,
+    std::vector<std::vector<Distance>>& distances,
+    std::vector<std::vector<Coordinates>>& predecessors
 ) {
-  std::vector<std::vector<Distance>> distances_matrix(
-      map.size(), std::vector<Distance>(map[0].size(), DISTANCE_MAX)
-  );
+  size_t rows = map.size();
+  size_t cols = map[0].size();
 
-  distances_matrix[starting_pos.second][starting_pos.first] = 0;
+  // Initialize distances to infinity and predecessors to (-1,-1)
+  distances.assign(rows, std::vector<Distance>(cols, DISTANCE_MAX));
+  predecessors.assign(rows, std::vector<Coordinates>(cols, Coordinates{-1, -1}));
+
+  // Get start row and column
+  distances[start_pos.second][start_pos.first] = 0;
   std::priority_queue<PathNode, std::vector<PathNode>, std::greater<>> paths_to_go;
-  paths_to_go.emplace(0, starting_pos);
+  paths_to_go.emplace(0, start_pos);
 
   while (!paths_to_go.empty()) {
     PathNode current_path_node = paths_to_go.top();
     paths_to_go.pop();
-    Coordinates current_vertex_pos = current_path_node.second;
+    Coordinates current_pos = current_path_node.second;
 
-    Distance distance_to_current_node =
-        distances_matrix[current_vertex_pos.second][current_vertex_pos.first];
+    Distance distance_to_current_node = distances[current_pos.second][current_pos.first];
 
-    if (current_vertex_pos == destination) {
-      // its lowest since we use priority_queue
-      return distance_to_current_node;
+    if (current_pos == destination) {
+      // early exit
+      return;
     }
 
     for (auto adj : GetAdjVertices(current_path_node.second, map)) {
       Coordinates adj_coords = adj.second;
-      Distance distance_to_adj_from_current = distances_matrix[adj_coords.second][adj_coords.first];
-      Distance calculated_distance = distance_to_current_node + VertexTypeToDistance(adj.first);
+      Distance distance_to_adj_from_current = distances[adj_coords.second][adj_coords.first];
+      Distance new_distance = distance_to_current_node + VertexTypeToDistance(adj.first);
 
-      if (distance_to_adj_from_current > calculated_distance) {
-        distances_matrix[adj_coords.second][adj_coords.first] = calculated_distance;
-        paths_to_go.emplace(calculated_distance, adj_coords);
+      if (distance_to_adj_from_current > new_distance) {
+        distances[adj_coords.second][adj_coords.first] = new_distance;
+        predecessors[adj_coords.second][adj_coords.first] = current_pos;
+        paths_to_go.emplace(new_distance, adj_coords);
       }
     }
   }
-
-  return DISTANCE_MAX;
 }
 
 }  // namespace
@@ -130,19 +136,19 @@ int main() {
   Coordinates map_size;
   std::cin >> map_size.first >> map_size.second;
 
-  Coordinates starting_pos;
-  std::cin >> starting_pos.first >> starting_pos.second;
-
-  // zero_based_indexing
-  starting_pos.first--;
-  starting_pos.second--;
+  Coordinates start_pos;
+  std::cin >> start_pos.second >> start_pos.first;
 
   Coordinates destination;
-  std::cin >> destination.first >> destination.second;
+  std::cin >> destination.second >> destination.first;
 
   // zero_based_indexing
   destination.first--;
   destination.second--;
+
+  // zero_based_indexing
+  start_pos.first--;
+  start_pos.second--;
 
   std::vector<std::vector<VertexType>> map(
       map_size.first, std::vector<VertexType>(map_size.second)
@@ -163,13 +169,56 @@ int main() {
     }
   }
 
-  Distance distance = Dijkstra(starting_pos, map, destination);
+  // Initialize distances and predecessors
+  std::vector<std::vector<Distance>> distances;
+  std::vector<std::vector<Coordinates>> predecessors;
 
-  if (distance == DISTANCE_MAX) {
+  Dijkstra(start_pos, map, destination, distances, predecessors);
+
+  Distance min_time = distances[destination.second][destination.first];
+
+  if (min_time == DISTANCE_MAX) {
     std::cout << -1 << '\n';
-  } else {
-    std::cout << distance << '\n';
+    return 0;
   }
+
+  std::cout << min_time << '\n';
+
+  // Reconstruct path
+  std::vector<char> path;
+  Coordinates current = destination;
+
+  while (current != start_pos) {
+    // Get predecessor for current
+    Coordinates pred = predecessors[current.second][current.first];
+    if (pred.first == static_cast<size_t>(-1)) {
+      break;  // invalid
+    }
+
+    int diff_col = (int)current.first - (int)pred.first;
+    int diff_row = (int)current.second - (int)pred.second;
+
+    if (diff_col > 0) {
+      path.push_back('E');
+    } else if (diff_col < 0) {
+      path.push_back('W');
+    } else if (diff_row > 0) {
+      path.push_back('S');
+    } else if (diff_row < 0) {
+      path.push_back('N');
+    }
+
+    current = pred;
+  }
+
+  // Reverse path to get start to end
+  std::reverse(path.begin(), path.end());
+
+  // Output the directions
+  for (char c : path) {
+    std::cout << c;
+  }
+  std::cout << '\n';
 
   return 0;
 }
